@@ -1,0 +1,21 @@
+{
+  "name": "advancedbans-web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "epoch-timeago": "^1.1.9",
+    "express": "^4.17.1",
+    "express-session": "^1.17.1",
+    "express-sessions": "^1.0.6",
+    "http": "0.0.1-security",
+    "mysql": "^2.18.1",
+    "unix-timestamp": "^0.2.0"
+  }
+}
