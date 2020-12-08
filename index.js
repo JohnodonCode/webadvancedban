@@ -1,13 +1,33 @@
 const express = require('express');
 const app = express();
 const session = require('express-session');
+const fetch = require('node-fetch');
 const fs = require('fs');
 const bodyParser = require('body-parser');
 const timeago = require('epoch-timeago').default;
 const sessionSecret = `KZTC$@eBn+9ug75VhF!twY#sW'X3/]v%Epxz<(]j&fcL)a?q6Q`;
 const mysql = require('mysql');
 const { serverName, serverHost, port } = require('./config.json');
+let version = '1.0.1';
+fetch(`https://www.johnodon.com/advancedban-web/latest.json`).then(res => res.json()).then(update => {
+    if(update.version != version) return console.log('Your current version of AdvancedBan Web Panel is out of date! Please download a new version at https://www.spigotmc.org/resources/advancedban-web-panel.85875/');
+    else return console.log('Your current version of AdvanedBan Web Panel is up to date.')
+});
 const completed = require('./config.json').completedDontTouchThis;
+const allowedArgs = ['--log', '--help', '-h'];
+const startupArgs = process.argv.splice(2);
+if(startupArgs.includes('-h') || startupArgs.includes('--help')) {
+    console.log('Allowed arguments:\n--help (alias: -h): Lists this help menu\n--log: Logs the IP address of any incoming request');
+    process.exit(0);
+}
+let invalidArgs = 0;
+startupArgs.forEach(arg => {
+    if(!allowedArgs.includes(arg)) { 
+        console.log(`INVALID ARGUMENT: ${arg}`); 
+        invalidArgs++;
+    }
+});
+if(invalidArgs > 0) console.log('Running with invalid arguments is allowed, but is not recommended. Next time you start the script, please run with allowed arguments.');
 const {  database_USER, database_NAME, database_HOST, database_PASS } = require('./db_info.json');
 const http = require('http').createServer(app);
 const db_config = {
@@ -17,7 +37,6 @@ const db_config = {
     database: database_NAME
 };
 let con;
-
 // functions
 function handleDisconnect() {
     con = mysql.createConnection(db_config); 
@@ -67,12 +86,133 @@ if(database_USER == "" || database_NAME == "" || database_HOST == "") {
 else {
     handleDisconnect();
 }
+const logger = (req, res, next)=>{
+    if(startupArgs.includes('--log')) {
+        const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        console.log(`REQUEST FROM: ${ip}\n-----------------------------------`);
+    };
+    next();
+}
+
+app.use(logger);
 
 
 app.use(express.static('public'));
 app.use(bodyParser.json({extended: false}));
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(session({ secret: sessionSecret, store: new session.MemoryStore(), expires: new Date(Date.now() + 604800), resave: false, saveUninitialized: false }));
+
+// API
+app.get('/api/punishments', async (req, res) => {
+    if(database_USER == "" || database_NAME == "" || database_HOST == "" || !completed) return res.redirect('/admin/setup');
+    let bans = [];
+    let sql = `SELECT * FROM \`Punishments\` ORDER BY start DESC`;
+    con.query(sql, async (err, result) => {
+        if(result.length < 1) { 
+            bans[0] = 'There are no active punishments.'; 
+        } else {
+            result.forEach(async punishment => {
+                let ends = '';
+                let seconds = millisToSeconds(punishment.end) - Math.round(Date.now() / 1000);
+                let a = {
+                    id: punishment.id,
+                    user: punishment.name,
+                    admin: punishment.operator,
+                    type: punishment.type,
+                    reason: punishment.reason,
+                    start: punishment.start,
+                    ends: punishment.end
+                }
+                bans.push(a);
+            });
+        }
+        let out = bans;
+        res.status(200).json(out);
+    });
+});
+
+app.get('/api/punishments/:id', async (req, res) => {
+    if(database_USER == "" || database_NAME == "" || database_HOST == "" || !completed) return res.redirect('/admin/setup');
+    if(isNaN(req.params.id)) return do404(req, res);
+    let sql = `SELECT * FROM \`Punishments\` WHERE id=${req.params.id}`;
+    con.query(sql, async (err, result) => {
+        if(err) throw err;
+        let bans = [];
+        if(result.length < 1) return do404(req, res);
+        else {
+            result.forEach(async punishment => {
+                let a = {
+                    id: punishment.id,
+                    user: punishment.name,
+                    admin: punishment.operator,
+                    type: punishment.type,
+                    reason: punishment.reason,
+                    start: punishment.start,
+                    ends: punishment.end
+                }
+                bans.push(a);
+            });
+        }
+        let out = bans;
+        res.status(200).json(out);
+    });
+});
+app.get('/api/punishments/history', async (req, res) => {
+    if(database_USER == "" || database_NAME == "" || database_HOST == "" || !completed) return res.redirect('/admin/setup');
+    let bans = [];
+    let sql = `SELECT * FROM \`PunishmentHistory\` ORDER BY start DESC`;
+    con.query(sql, async (err, result) => {
+        if(result.length < 1) { 
+            bans[0] = 'There are no active punishments.'; 
+        } else {
+            result.forEach(async punishment => {
+                let ends = '';
+                let seconds = millisToSeconds(punishment.end) - Math.round(Date.now() / 1000);
+                let a = {
+                    id: punishment.id,
+                    user: punishment.name,
+                    admin: punishment.operator,
+                    type: punishment.type,
+                    reason: punishment.reason,
+                    start: punishment.start,
+                    ends: punishment.end
+                }
+                bans.push(a);
+            });
+        }
+        let out = bans;
+        res.status(200).json(out);
+    });
+});
+
+app.get('/api/punishments/history/:id', async (req, res) => {
+    if(database_USER == "" || database_NAME == "" || database_HOST == "" || !completed) return res.redirect('/admin/setup');
+    if(isNaN(req.params.id)) return do404(req, res);
+    let sql = `SELECT * FROM \`PunishmentHistory\` WHERE id=${req.params.id}`;
+    con.query(sql, async (err, result) => {
+        if(err) throw err;
+        let bans = [];
+        if(result.length < 1) return do404(req, res);
+        else {
+            result.forEach(async punishment => {
+                let a = {
+                    id: punishment.id,
+                    user: punishment.name,
+                    admin: punishment.operator,
+                    type: punishment.type,
+                    reason: punishment.reason,
+                    start: punishment.start,
+                    ends: punishment.end
+                }
+                bans.push(a);
+            });
+        }
+        let out = bans;
+        res.status(200).json(out);
+    });
+});
+
+// Web pages 
 
 app.get('/', async (req, res) => {
     if(database_USER == "" || database_NAME == "" || database_HOST == "" || !completed) return res.redirect('/admin/setup');
@@ -211,8 +351,6 @@ app.get('/admin/setup/config', async (req, res) => {
     
 </head>
 <body>
-
-
 <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.js" defer></script>
 <div class="container max-w-full mx-auto py-24 px-6">
   <div class="max-w-sm mx-auto px-6">
@@ -295,8 +433,6 @@ app.get('/admin/setup/done', async (req, res) => {
     
 </head>
 <body>
-
-
 <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.js" defer></script>
 <div class="container max-w-full pt-24 px-6">
   <div class="max-w-sm mx-auto px-1/2">
@@ -358,6 +494,8 @@ app.get('/punishments', async (req, res) => {
                 else if(punishment.punishmentType == 'WARNING') type = `<td class="border px-4 py-2 text-orange-700"><b>Warning</b></td>`;
                 else if(punishment.punishmentType == 'TEMP_WARNING') type = `<td class="border px-4 py-2 text-orange-600"><b>Temp-Warning</b></td>`;
                 else if(punishment.punishmentType == 'KICK') type = `<td class="border px-4 py-2 text-yellow-600"><b>Kick</b></td>`;
+                else if(punishment.punishmentType == 'TEMP_MUTE') type = `<td class="border px-4 py-2 text-yellow-600"><b>Temp-Mute</b></td>`;
+                else if(punishment.punishmentType == 'MUTE') type = `<td class="border px-4 py-2 text-red-700"><b>Mute</b></td>`;
                 else type = `<td class="border px-4 py-2 text-yellow-600"><b>${punishment.punishmentType}</b></td>`;
 
 
@@ -401,8 +539,6 @@ app.get('/punishments', async (req, res) => {
                         </svg>
                         <div class="pl-2">History</div>
 </div>
-
-
       <input type="search" id="search" onkeyup="search()" class="flex text-lg w-full bg-purple-white shadow rounded border-0 px-6 py-4 mb-2 mt-4 mb-8" placeholder="Search">
     
     </div>
@@ -483,6 +619,8 @@ app.get('/punishments/history', async (req, res) => {
                 else if(punishment.punishmentType == 'WARNING') type = `<td class="border px-4 py-2 text-orange-700"><b>Warning</b></td>`;
                 else if(punishment.punishmentType == 'TEMP_WARNING') type = `<td class="border px-4 py-2 text-orange-600"><b>Temp-Warning</b></td>`;
                 else if(punishment.punishmentType == 'KICK') type = `<td class="border px-4 py-2 text-yellow-600"><b>Kick</b></td>`;
+                else if(punishment.punishmentType == 'TEMP_MUTE') type = `<td class="border px-4 py-2 text-yellow-600"><b>Temp-Mute</b></td>`;
+                else if(punishment.punishmentType == 'MUTE') type = `<td class="border px-4 py-2 text-red-700"><b>Mute</b></td>`;
                 else type = `<td class="border px-4 py-2 text-yellow-600"><b>${punishment.punishmentType}</b></td>`;
 
 
@@ -527,8 +665,6 @@ app.get('/punishments/history', async (req, res) => {
                         </svg>
                         <div class="pl-2">History</div>
                         </div>
-
-
                         <input type="search" id="search" onkeyup="search()" class="flex text-lg w-full bg-purple-white shadow rounded border-0 px-6 py-4 mb-2 mt-4 mb-8" placeholder="Search">
                       
                       </div>
@@ -618,7 +754,7 @@ app.get('/punishments/:id', async (req, res) => {
 
                 ban.push(`
                 <tr>
-                    <td class="border px-4 py-2"><a href="/punishments/history/${punishment.id}">${punishment.name}</a></td>
+                    <td class="border px-4 py-2"><a href="/punishments/${punishment.id}">${punishment.name}</a></td>
                     <td class="border px-4 py-2">${punishment.operator}</td>
                     ${type}
                     <td class="border px-4 py-2">${punishment.reason}</td>
@@ -751,7 +887,7 @@ app.get('/punishments/history/:id', async (req, res) => {
                     <div onclick="window.location.href='/punishments'" class="flex cursor-pointer border px-4 py-2 text-lg text-grey-darkest border-b-0">
                     <img width="18" height="18" src="/svg/sledgehammer.svg" />
                         <div class="pl-2">Punishments</div>
-                    </div>punish
+                    </div>
                     <div onclick="window.location.href='/punishments/history'" class="flex cursor-pointer border px-4 py-2 text-lg text-grey-darkest">
                         <svg width="18" height="18" viewBox="0 0 2048 1792" xmlns="http://www.w3.org/2000/svg">
                             <path d="M640 896v512h-256v-512h256zm384-512v1024h-256v-1024h256zm1024 1152v128h-2048v-1536h128v1408h1920zm-640-896v768h-256v-768h256zm384-384v1152h-256v-1152h256z"
