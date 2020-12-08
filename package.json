@@ -1,6 +1,6 @@
 {
   "name": "advancedbans-web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "express-sessions": "^1.0.6",
     "http": "0.0.1-security",
     "mysql": "^2.18.1",
+    "node-fetch": "^2.6.1",
     "unix-timestamp": "^0.2.0"
   }
 }
