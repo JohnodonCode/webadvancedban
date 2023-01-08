@@ -9,10 +9,6 @@ const sessionSecret = `KZTC$@eBn+9ug75VhF!twY#sW'X3/]v%Epxz<(]j&fcL)a?q6Q`;
 const mysql = require('mysql');
 const { serverName, serverHost, port } = require('./config.json');
 let version = '1.0.1';
-fetch(`https://www.johnodon.com/advancedban-web/latest.json`).then(res => res.json()).then(update => {
-    if(update.version != version) return console.log('Your current version of AdvancedBan Web Panel is out of date! Please download a new version at https://www.spigotmc.org/resources/advancedban-web-panel.85875/');
-    else return console.log('Your current version of AdvanedBan Web Panel is up to date.')
-});
 const completed = require('./config.json').completedDontTouchThis;
 const allowedArgs = ['--log', '--help', '-h'];
 const startupArgs = process.argv.splice(2);
